@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Simulasi Air Pollution Ultimate</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+</head>
+<body>
+<script>
+
+let factorySlider, carSlider;
+let treeSlider, rainSlider;
+let particles = [];
+let cars = [];
+let factoryColors = [];
+let pollution = 0;
+let treePositions = []
+
+let bgMusic;
+
+// ================= SETUP =================
+function setup() {
+function windowResized() {
+  resizeCanvas(min(windowWidth, 1000), 500);
+}
+  let w = windowWidth;
+  let h = 500;
+  createCanvas(min(windowWidth, 1000), 500);
+  factorySlider = createSlider(0, 15, 3);
+  factorySlider.position(40, 20);
+
+  carSlider = createSlider(0, 20, 5);
+  carSlider.position(40, 50);
+
+  treeSlider = createSlider(0, 20, 5);
+  treeSlider.position(40, 80);
+
+  rainSlider = createSlider(0, 20, 0);
+  rainSlider.position(40, 110);
+
+for(let i=0;i<20;i++){
+
+  let isLeft = random() < 0.5;
+
+  let x, y;
+
+  if(isLeft){
+    // 🌄 GUNUNG KIRI
+    x = random(50,350);
+
+    if(x <= 200){
+      y = map(x, 50, 200, 300, 160);
+    } else {
+      y = map(x, 200, 350, 160, 300);
+    }
+
+  } else {
+    // 🌄 GUNUNG KANAN
+    x = random(400,750);
+
+    if(x <= 550){
+      y = map(x, 400, 550, 300, 160);
+    } else {
+      y = map(x, 550, 750, 160, 300);
+    }
+  }
+
+  // biar nempel tanah
+  y += random(10,40);
+
+  treePositions.push({x:x, y:y});
+}
+
+
+  // warna pabrik
+  for(let i=0;i<15;i++){
+    factoryColors.push(
+      color(random(120,180), random(120,180), random(120,180))
+    );
+  }
+
+  // musik (link bebas)
+  bgMusic = createAudio('https://cdn.pixabay.com/audio/2022/03/15/audio_115b9b1b3b.mp3');
+  bgMusic.loop();
+  bgMusic.volume(0.2);
+}
+
+// ================= MOBIL =================
+class Car {
+  constructor(x){
+    this.x=x;
+    this.y=390;
+    this.speed=random(1,2);
+    this.color = color(random(100,255), random(100,255), random(100,255));
+  }
+
+  move(){
+    this.x+=this.speed;
+    if(this.x>width)this.x=-80;
+  }
+
+  show(){
+    fill(this.color);
+    rect(this.x,this.y,60,20,10);
+
+    fill(red(this.color)-20, green(this.color)-20, blue(this.color)-20);
+    rect(this.x+10,this.y-15,40,20,10);
+
+    fill(200,230,255);
+    rect(this.x+15,this.y-12,12,10,3);
+    rect(this.x+33,this.y-12,12,10,3);
+
+    fill(0);
+    ellipse(this.x+15,this.y+20,12);
+    ellipse(this.x+45,this.y+20,12);
+
+    if(frameCount % 20 == 0){
+      particles.push(new Particle(this.x+10,this.y));
+    }
+  }
+}
+
+// ================= PARTIKEL =================
+class Particle{
+  constructor(x,y){
+    this.x=x;
+    this.y=y;
+    this.size=random(4,7);
+    this.alpha=150;
+  }
+
+  move(){
+    this.y-=0.6;
+    this.x+=random(-0.3,0.3);
+    this.alpha -= 1;
+  }
+
+  show(){
+    fill(50,this.alpha);
+    noStroke();
+    ellipse(this.x,this.y,this.size);
+  }
+}
+
+// ================= HUJAN =================
+function drawRain(intensity){
+  stroke(180,200,255,150);
+  for(let i=0;i<intensity*5;i++){
+    let x = random(width);
+    let y = random(height);
+    line(x,y,x,y+10);
+  }
+  noStroke();
+}
+
+// ================= DRAW =================
+function draw(){
+
+  let factories = factorySlider.value();
+  let carsCount = carSlider.value();
+  let trees = treeSlider.value();
+  let rain = rainSlider.value();
+
+  // POLUSI (dipengaruhi pohon & hujan)
+  pollution = factories * 8 + carsCount * 4;
+  pollution -= trees * 3;
+  pollution -= rain * 2;
+  pollution = constrain(pollution, 0, 200);
+
+  // LANGIT
+  let skyR = map(pollution, 0, 200, 135, 120);
+  let skyG = map(pollution, 0, 200, 206, 120);
+  let skyB = map(pollution, 0, 200, 235, 120);
+
+  // efek hujan bikin cerah
+  skyR += rain*2;
+  skyG += rain*3;
+  skyB += rain*4;
+
+  background(skyR, skyG, skyB);
+
+  drawMountain();
+  drawTrees(trees);
+  drawFactories(factories);
+  drawRoad();
+
+  // mobil
+  while(cars.length < carsCount){
+    cars.push(new Car(random(width)));
+  }
+  while(cars.length > carsCount){
+    cars.pop();
+  }
+
+  for(let c of cars){
+    c.move();
+    c.show();
+  }
+
+  // partikel
+  for(let i=particles.length-1;i>=0;i--){
+    particles[i].move();
+    particles[i].show();
+
+    if(particles[i].alpha <= 0){
+      particles.splice(i,1);
+    }
+  }
+
+  // hujan mengurangi partikel
+  if(rain > 0 && particles.length > 0){
+    particles.splice(0, rain*2);
+  }
+
+  drawRain(rain);
+
+  drawGraph(factories, carsCount);
+  drawAirIndicator();
+
+  fill(0);
+  text("Pabrik", 200, 35);
+  text("Kendaraan", 200, 65);
+  text("Pohon", 200, 95);
+  text("Hujan", 200, 125);
+
+  // CREDIT 😆
+  textSize(12);
+  fill(0);
+  text("Produced by Riyanti for Biologydaebak✨", 50, 480);
+}
+
+// ================= GUNUNG =================
+function drawMountain(){
+  fill(100,180,100);
+  triangle(200,300,400,120,600,300);
+
+  fill(120,200,120);
+  triangle(400,300,550,160,750,300);
+}
+
+// ================= POHON =================
+function drawTrees(n){
+  for(let i=0;i<n;i++){
+
+    let pos = treePositions[i];
+
+    // BATANG
+    fill(120,70,20);
+    rect(pos.x, pos.y, 6, 25);
+
+    // WARNA DAUN (terpengaruh polusi)
+    let r = map(pollution, 0, 200, 50, 120);
+    let g = map(pollution, 0, 200, 180, 80);
+
+    fill(r, g, 50);
+
+    // UKURAN POHON (perspektif gunung)
+    let size = map(pos.y, 160, 340, 12, 24);
+
+    // DAUN
+    ellipse(pos.x+3, pos.y-5, size);
+
+    // BONUS: goyang halus (hidup 😆)
+    let sway = sin(frameCount * 0.05 + i) * 2;
+    ellipse(pos.x+3 + sway, pos.y-10, size * 0.7);
+
+    // BONUS: kalau polusi tinggi → daun hilang
+    if(pollution > 150){
+      fill(120,70,20);
+      rect(pos.x, pos.y-5, 4, 10); // batang kering
+    }
+  }
+}
+
+// ================= JALAN =================
+function drawRoad(){
+  fill(50);
+  rect(0,380,width,80);
+
+  stroke(255);
+  strokeWeight(3);
+  for(let i=0;i<width;i+=40){
+    line(i,420,i+20,420);
+  }
+  noStroke();
+}
+
+// ================= PABRIK =================
+function drawFactories(n){
+  for(let i=0;i<n;i++){
+
+    let x = 50 + i*80;
+
+    let baseColor = factoryColors[i];
+
+    // BADAN PABRIK
+    fill(baseColor);
+    rect(x,300,70,60,15);
+
+    // ATAP
+    fill(red(baseColor)-20, green(baseColor)-20, blue(baseColor)-20);
+    rect(x-5,285,80,20,10);
+
+    // CEROBONG
+    fill(180);
+    rect(x+15,240,15,50,8);
+    rect(x+45,250,12,40,8);
+
+    // UJUNG CEROBONG
+    fill(120);
+    ellipse(x+22,240,15);
+    ellipse(x+51,250,12);
+
+    // JENDELA
+    fill(255, 240, 180);
+    rect(x+10,315,12,12,4);
+    rect(x+30,315,12,12,4);
+    rect(x+50,315,12,12,4);
+
+    rect(x+20,335,12,12,4);
+    rect(x+40,335,12,12,4);
+
+    // ASAP
+    if(frameCount % 15 == 0){
+      particles.push(new Particle(x+22,240));
+      particles.push(new Particle(x+50,250));
+    }
+  }
+}
+
+// ================= GRAFIK =================
+function drawGraph(factories, cars){
+
+  let total = factories + cars;
+  let pollutionLevel = particles.length;
+
+  fill(255);
+  rect(650,50,300,200);
+
+  stroke(0);
+  line(650,250,950,250); // sumbu X
+  line(650,50,650,250);  // sumbu Y
+
+  let x = map(total,0,35,650,950);
+  let y = map(pollutionLevel,0,300,250,50);
+
+  fill(255,0,0);
+  ellipse(x,y,8);
+
+  noStroke();
+  fill(0);
+
+  // JUDUL
+  text("Grafik Polusi",720,40);
+
+  // LABEL
+  text("X: Kendaraan + Pabrik",680,280);
+  text("Y: Jumlah Pencemar",520,60);
+
+  // ANGKA X
+  for(let i=0;i<=35;i+=5){
+    let tx = map(i,0,35,650,950);
+    text(i,tx,270);
+  }
+
+  // ANGKA Y
+  for(let i=0;i<=300;i+=100){
+    let ty = map(i,0,300,250,50);
+    text(i,620,ty);
+  }
+}
+
+// ================= INDIKATOR =================
+function drawAirIndicator(){
+
+  let status = "";
+  let col;
+
+  if(pollution < 70){
+    status = "Baik";
+    col = color(0,200,0);
+  } else if(pollution < 140){
+    status = "Sedang";
+    col = color(255,200,0);
+  } else {
+    status = "Berbahaya";
+    col = color(255,0,0);
+  }
+
+  fill(col);
+  rect(750,20,200,40,10);
+
+  fill(0);
+  text("Udara: " + status, 760,45);
+}
+
+</script>
+</body>
+</html>
